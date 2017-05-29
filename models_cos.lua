@@ -1,11 +1,11 @@
 
-function createModel(Dsize, nout, KKw, shared)
+function createModel(Dsize, nout, KKw, shared, div)
     	-- define model to train
      	local featext = nn.Sequential()
     	local D     = Dsize 
     	local kW    = KKw 
     	local dW    = 1 
-    	local NumFilter = D
+    	local NumFilter = D/div
     	local sepModel = shared
  
     --	dofile "PaddingReshape.lua"
@@ -17,13 +17,15 @@ function createModel(Dsize, nout, KKw, shared)
 		incep1max:add(nn.Tanh())
 		incep1max:add(nn.Max(1))
 		incep1max:add(nn.Reshape(NumFilter,1))		  
-		local incep2max = nn.Sequential()
-		incep2max:add(nn.Tanh())
-		incep2max:add(nn.Max(1))
-		incep2max:add(nn.Reshape(NumFilter,1))			  
+--		local incep2max = nn.Sequential()
+--		incep2max:add(nn.Max(1))
+--		incep2max:add(nn.View(torch.DoubleTensor{1,D}))
+--        	incep2max:add(nn.TemporalConvolution(D,NumFilter,1,dw))
+--		incep2max:add(nn.Tanh())
+--		incep2max:add(nn.Reshape(NumFilter,1))			  
 		local combineDepth = nn.Concat(2)
 		combineDepth:add(incep1max)
-		combineDepth:add(incep2max)
+--		combineDepth:add(incep2max)
 		  
 		local ngram = kW                
 		for cc = 2, ngram do
@@ -40,12 +42,14 @@ function createModel(Dsize, nout, KKw, shared)
 		incep1mean:add(nn.Tanh())
 		incep1mean:add(nn.Mean(1))
 		incep1mean:add(nn.Reshape(NumFilter,1))		    		  		  
-		local incep2mean = nn.Sequential()
-		incep2mean:add(nn.Tanh())
-		incep2mean:add(nn.Mean(1))
-		incep2mean:add(nn.Reshape(NumFilter,1))		  
+--		local incep2mean = nn.Sequential()
+--		incep2mean:add(nn.Mean(1))
+--		incep2mean:add(nn.View(torch.DoubleTensor{1,D}))
+--		incep2mean:add(nn.TemporalConvolution(D,NumFilter,1,dw))
+--		incep2mean:add(nn.Tanh())
+--		incep2mean:add(nn.Reshape(NumFilter,1))		  
 		combineDepth:add(incep1mean)
-		combineDepth:add(incep2mean)		  
+--		combineDepth:add(incep2mean)		  
 		for cc = 2, ngram do
 		    local incepMean = nn.Sequential()
 		    incepMean:add(nn.TemporalConvolution(D,NumFilter,cc,dw))
@@ -71,7 +75,7 @@ function createModel(Dsize, nout, KKw, shared)
 		d=nn.Concat(1) 
         
         local MaxMean = 2
-		local items = (ngram+1)*MaxMean
+		local items = (ngram)*MaxMean
 		--local separator = items
 			 				
 		for i=1,NumFilter do
@@ -83,29 +87,29 @@ function createModel(Dsize, nout, KKw, shared)
 				local c1=nn.Sequential()
 				local c2=nn.Sequential()
 				if j == 1 then 
-					c1:add(nn.Narrow(1,1,ngram+1)) -- first half (items/2)
-					c2:add(nn.Narrow(1,items+1,ngram+1)) -- first half (items/2)
+					c1:add(nn.Narrow(1,1,ngram)) -- first half (items/2)
+					c2:add(nn.Narrow(1,items+1,ngram)) -- first half (items/2)
 				else 
-					c1:add(nn.Narrow(1,ngram+2,ngram+1)) -- 
-					c2:add(nn.Narrow(1,items+ngram+2,ngram+1)) --each is ngram+1 portion (max or mean)
+					c1:add(nn.Narrow(1,ngram+1,ngram)) -- 
+					c2:add(nn.Narrow(1,items+ngram+1,ngram)) --each is ngram+1 portion (max or mean)
 				end						
 				minus:add(c1)
 				minus:add(c2)
 				connection:add(minus) 				
 				local similarityC=nn.Concat(1) 	
-				local s1=nn.Sequential()
-				s1:add(nn.SplitTable(2))
-				s1:add(nn.PairwiseDistance(2)) -- scalar
+--				local s1=nn.Sequential()
+--				s1:add(nn.SplitTable(2))
+--				s1:add(nn.PairwiseDistance(2)) -- scalar
 				local s2=nn.Sequential()					
 				s2:add(nn.SplitTable(2)) 
 				s2:add(nn.CsDis()) -- scalar
-				local s3=nn.Sequential()
-				s3:add(nn.SplitTable(2))
-				s3:add(nn.CSubTable()) -- linear
-				s3:add(nn.Abs())
-				similarityC:add(s1)
+--				local s3=nn.Sequential()
+--				s3:add(nn.SplitTable(2))
+--				s3:add(nn.CSubTable()) -- linear
+--				s3:add(nn.Abs())
+--				similarityC:add(s1)
 				similarityC:add(s2)	
-				similarityC:add(s3)				
+--				similarityC:add(s3)				
 				connection:add(similarityC)										
 				d:add(connection)				
 			end

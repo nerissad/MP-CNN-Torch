@@ -8,7 +8,7 @@ function createModel(Dsize, nout, KKw, shared)
     	local NumFilter = D
     	local sepModel = shared
  
-    --	dofile "PaddingReshape.lua"
+    	--dofile "PaddingReshape.lua"
 		
 		deepQuery=nn.Sequential()
    		D = Dsize 

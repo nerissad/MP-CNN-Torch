@@ -1,8 +1,8 @@
---[[
-  Author: Hua He
-  Usage： th trainSIC.lua
-  Training script for semantic relatedness prediction on the SICK dataset. 
---]]
+------ Adapted from Multi-Perspective Sentence Similarity Modeling with Convolutional Neural Networks
+------ Hua He, Kevin Gimpel, and Jimmy Lin
+------ Department of Computer Science, University of Maryland, College Park
+------ Toyota Technological Institute at Chicago
+------ David R. Cheriton School of Computer Science, University of Waterloo
 
 require('torch')
 require('nn')
@@ -11,6 +11,7 @@ require('optim')
 require('xlua')
 require('sys')
 require('lfs')
+require('gnuplot')
 
 similarityMeasure = {}
 
@@ -18,10 +19,10 @@ include('util/read_data.lua')
 include('util/Vocab.lua')
 include('Conv.lua')
 include('CsDis.lua')
---include('PaddingReshape.lua')
+
 printf = utils.printf
 
--- global paths (modify if desired)
+--global paths
 similarityMeasure.data_dir        = 'data'
 similarityMeasure.models_dir      = 'trained_models'
 similarityMeasure.predictions_dir = 'predictions'
@@ -39,22 +40,31 @@ function pearson(x, y)
   return x:dot(y) / (x:norm() * y:norm())
 end
 
+--Mean Square Error
+function mse(x, y)
+  z = x - y
+  z = z:pow(2)
+  return z:mean()
+end
+
 -- read command line arguments
 local args = lapp [[
 Training script for semantic relatedness prediction on the SICK dataset.
-  -m,--model  (default dependency) Model architecture: [dependency, lstm, bilstm]
-  -l,--layers (default 1)          Number of layers (ignored for Tree-LSTM)
-  -d,--dim    (default 150)        LSTM memory dimension
+  -e,--edim (default 50)        Nr Dimensions in the Embed Vector
+  -d,--dim  (default 50)        Nr Neurons in the Hidden Layer
+  -s,--shared (default 1)       Shared Weights in the Convolution Layer 
+  -l,--learn (default 0.01)     Learning Rate
+  -n, --epoch (default 25)      Nr Epoch
+  -c, --cost (default 1)        0-MSE , 1-KL Div
+  -f, --flag (default 1)        Variants
+  -w, --win (default 3)         n-gram windows
+  -r, --rdiv (default 1)        reduced dimensions
 ]]
 
-local model_name, model_class, model_structure
-model_name = 'convOnly'
-model_class = similarityMeasure.Conv
-model_structure = model_name
 
-torch.seed()
---torch.manualSeed(-3.0753778015266e+18)
-print('<torch> using the automatic seed: ' .. torch.initialSeed())
+--torch.seed()
+torch.manualSeed(-3.0753778015266e+18)
+print('<torch> using the Manual seed: ' .. torch.initialSeed())
 
 -- directory containing dataset files
 local data_dir = 'data/sick/'
@@ -66,12 +76,12 @@ local vocab = similarityMeasure.Vocab(data_dir .. 'vocab-cased.txt')
 print('loading word embeddings')
 
 local emb_dir = 'data/glove/'
-local emb_prefix = emb_dir .. 'glove.840B'
-local emb_vocab, emb_vecs = similarityMeasure.read_embedding(emb_prefix .. '.vocab', emb_prefix .. '.300d.th')
+local emb_prefix = emb_dir .. 'glove.6B'
+local emb_vocab, emb_vecs = similarityMeasure.read_embedding(emb_prefix .. '.vocab', emb_prefix .. '.' .. args.edim .. 'd.th')
 
 local emb_dim = emb_vecs:size(2)
 
--- use only vectors in vocabulary (not necessary, but gives faster training)
+-- Discard vectors not in Vocab
 local num_unk = 0
 local vecs = torch.Tensor(vocab.size, emb_dim)
 for i = 1, vocab.size do
@@ -101,64 +111,67 @@ printf('num dev   = %d\n', dev_dataset.size)
 printf('num test  = %d\n', test_dataset.size)
 
 -- initialize model
-local model = model_class{
+local model = similarityMeasure.Conv{
   emb_vecs   = vecs,
-  structure  = model_structure,
-  num_layers = args.layers,
-  mem_dim    = args.dim,
-  task       = taskD,
+  sim_nhidden = args.dim,
+  learning_rate = args.learn,
+  shared = args.shared , 
+  criteria = args.cost,
+  flag = args.flag,
+  win = args.win,
+  rdiv = args.rdiv
 }
 
 -- number of epochs to train
-local num_epochs = 30
+local num_epochs = args.epoch
 
 -- print information
 header('model configuration')
 printf('max epochs = %d\n', num_epochs)
 model:print_config()
 
-
-if lfs.attributes(similarityMeasure.predictions_dir) == nil then
-  lfs.mkdir(similarityMeasure.predictions_dir)
-end
-
 -- train
 local train_start = sys.clock()
-local best_dev_score = -1.0
-local best_dev_model = model
-
--- threads
---torch.setnumthreads(4)
---print('<torch> number of threads in used: ' .. torch.getnumthreads())
+local best_dev_score_p = -1.0
+local best_dev_score_mse = 100.0
+--local best_dev_model = model
 
 header('Training model')
+print('Epoch\tLossF\tDevp\tTestp\tDevMSE\tTestMSE')
 
-local id = 10005
-print("Id: " .. id)
 for i = 1, num_epochs do
   local start = sys.clock()
-  print('--------------- EPOCH ' .. i .. '--- -------------')
-  model:trainCombineOnly(train_dataset)
-  print('Finished epoch in ' .. ( sys.clock() - start) )
+
+  local train_loss = model:trainCombineOnly(train_dataset)
   
   local dev_predictions = model:predict_dataset(dev_dataset)
-  local dev_score = pearson(dev_predictions, dev_dataset.labels)
-  printf('-- dev score: %.5f\n', dev_score)
+  local dev_score_p = pearson(dev_predictions, dev_dataset.labels)
+  local dev_score_mse = mse(dev_predictions, dev_dataset.labels)
 
-  if dev_score >= best_dev_score then
-    best_dev_score = dev_score
+  if (dev_score_p >= best_dev_score_p) then
+    best_dev_score_p = dev_score_p
+    best_dev_score_mse = dev_score_mse
     local test_predictions = model:predict_dataset(test_dataset)
-    local test_sco = pearson(test_predictions, test_dataset.labels)
-    printf('[[BEST DEV]]-- test score: %.4f\n', pearson(test_predictions, test_dataset.labels))
-
+    local test_sco_p = pearson(test_predictions, test_dataset.labels)
+    local test_sco_mse = mse(test_predictions, test_dataset.labels)
+    printf('%d\t%d\t%.5f\t%.5f\t%.5f\t%.5f\n', i,train_loss,dev_score_p,test_sco_p,dev_score_mse,test_sco_mse)
     local predictions_save_path = string.format(
-	similarityMeasure.predictions_dir .. '/results-%s.%dl.%dd.epoch-%d.%.5f.%d.pred', args.model, args.layers, args.dim, i, test_sco, id)
-    local predictions_file = torch.DiskFile(predictions_save_path, 'w')
-    print('writing predictions to ' .. predictions_save_path)
-    for i = 1, test_predictions:size(1) do
-      predictions_file:writeFloat(test_predictions[i])
-    end
-    predictions_file:close()
+	similarityMeasure.predictions_dir .. '/results-.edim%d.dim%d.shared%d.cost%d.var%d.win%d.rdiv%d.epoch-%d.%.5f.pred', args.edim, args.dim, args.shared,args.cost,args.flag,args.win,args.rdiv,i, test_sco_p)
+--    local predictions_file = torch.DiskFile(predictions_save_path, 'w')
+--    for i = 1, test_predictions:size(1) do
+--      local temp = torch.FloatStorage({test_dataset.labels[i],test_predictions[i]})
+--      predictions_file:writeFloat(temp)
+--    end
+--    predictions_file:close()
+    gnuplot.pngfigure(predictions_save_path ..'.png')
+    gnuplot.axis{1,5,1,5}
+    gnuplot.plot(
+        {'',  test_dataset.labels,  test_predictions,  '.'})
+    gnuplot.xlabel('Dataset Labels')
+    gnuplot.ylabel('Predicted Similarity')
+    gnuplot.plotflush()
+  else 
+    printf('%d\t%d\t%.5f\t-\t%.5f\t-\n', i,train_loss,dev_score_p, dev_score_mse)
   end
 end
 print('finished training in ' .. (sys.clock() - train_start))

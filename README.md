@@ -1,10 +1,17 @@
-# Multi-Perspective Convolutional Neural Networks for Modeling Textual Similarity
+Text Similarity Measurement using Convolutional Neural Networks
 
-This repo contains the Torch implementation of multi-perspective convolutional neural networks for modeling textual similarity, described in the following paper:
 
-+ Hua He, Kevin Gimpel, and Jimmy Lin. [Multi-Perspective Sentence Similarity Modeling with Convolutional Neural Networks.](http://aclweb.org/anthology/D/D15/D15-1181.pdf) *Proceedings of the 2015 Conference on Empirical Methods in Natural Language Processing (EMNLP 2015)*, pages 1576-1586.
+Introduction
+------------
 
-This model does not require external resources such as WordNet or parsers, does not use sparse features, and achieves good accuracy on standard public datasets.
+This tool can be used to measure semantic similarity given any two pieces of texts. 
+
+This repo contains the implementation of a convolutional neural network based model for comparing two sentences. Our model does not require external resources such as WordNet or parsers, and can still achieve highly competitive performance as measured on 3 public datasets (SICK, MSRVID, and MSRP).
+
+For more details, please refer to our recent paper:
+- ``Multi-Perspective Sentence Similarity Modeling with Convolutional Neural Networks``
+- Hua He, Kevin Gimpel, and Jimmy Lin. Proceedings of the 2015 Conference on Empirical Methods in Natural Language Processing (EMNLP 2015).
+
 
 Installation and Dependencies
 ------------
@@ -45,28 +52,6 @@ The last thing is to change the training and model code slightly to process your
 - more details can refer to issue https://github.com/hohoCode/textSimilarityConvNet/issues/6
 
 Then you should be able to run your training code.
-
-Trained Model
--------------
-We also porvide a model which is already trained on STS dataset. So it is easier if you just want to use the model and do not want to re-train it. 
-
-The tarined model download link is [HERE](https://drive.google.com/file/d/0B-lu_eEMkpVxYVdPMldJX3JDVjg/view?usp=sharing). Model file size is 500MB. To use the trained model, then simply use codes below:
-```
-include('Conv.lua')
-modelTrained = torch.load("download_local_location/modelSTS.trained.th", 'ascii')
-modelTrained.convModel:evaluate()
-modelTrained.softMaxC:evaluate()
-local linputs = torch.zeros(rigth_sentence_length, emd_dimension)
-linpus = XassignEmbeddingValuesX
-local rinputs = torch.zeros(left_sentence_length, emd_dimension)
-rinpus = XassignEmbeddingValuesX
-
-local part2 = modelTrained.convModel:forward({linputs, rinputs})
-local output = modelTrained.softMaxC:forward(part2)
-local val = torch.range(0, 5, 1):dot(output:exp()) 
-return val/5
-```
-The ouput variable 'val' contains a similarity score between [0,1]. The input linputs1/rinputs are torch tensors and you need to fill in the word embedding values for both.
 
 Ackowledgement
 -------------
