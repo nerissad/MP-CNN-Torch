@@ -42,3 +42,4 @@ end
 file:close()
 vocab:close()
 torch.save(vecpath, vecs)
+

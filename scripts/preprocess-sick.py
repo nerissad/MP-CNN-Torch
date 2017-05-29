@@ -1,6 +1,7 @@
 """
-This file is not required to run our codes, as we have provided the preprocessed data.
-We Thank Kai Sheng Tai for the preprocessing script of SICK data.
+We Thank Kai Sheng Tai for providing this preprocessing/basis codes. 
+Preprocessing script for SICK data.
+
 """
 
 import os
@@ -21,22 +22,11 @@ def dependency_parse(filepath, cp='', tokenize=True):
     dirpath = os.path.dirname(filepath)
     filepre = os.path.splitext(os.path.basename(filepath))[0]
     tokpath = os.path.join(dirpath, filepre + '.toks')
-    parentpath = os.path.join(dirpath, filepre + '.parents')
-    relpath =  os.path.join(dirpath, filepre + '.rels')
     tokenize_flag = '-tokenize - ' if tokenize else ''
-    cmd = ('java -cp %s DependencyParse -tokpath %s -parentpath %s -relpath %s %s < %s'
-        % (cp, tokpath, parentpath, relpath, tokenize_flag, filepath))
+    cmd = ('java -cp %s edu.stanford.nlp.process.PTBTokenizer -preserveLines < %s > %s'
+        % (cp, filepath, tokpath))
     os.system(cmd)
 
-def constituency_parse(filepath, cp='', tokenize=True):
-    dirpath = os.path.dirname(filepath)
-    filepre = os.path.splitext(os.path.basename(filepath))[0]
-    tokpath = os.path.join(dirpath, filepre + '.toks')
-    parentpath = os.path.join(dirpath, filepre + '.cparents')
-    tokenize_flag = '-tokenize - ' if tokenize else ''
-    cmd = ('java -cp %s ConstituencyParse -tokpath %s -parentpath %s %s < %s'
-        % (cp, tokpath, parentpath, tokenize_flag, filepath))
-    os.system(cmd)
 
 def build_vocab(filepaths, dst_path, lowercase=True):
     vocab = set()
@@ -83,13 +73,7 @@ if __name__ == '__main__':
     make_dirs([train_dir, dev_dir, test_dir])
 
     # java classpath for calling Stanford parser
-    classpath = ':'.join([
-        lib_dir,
-        os.path.join(lib_dir, 'stanford-parser/stanford-parser.jar'),
-        os.path.join(lib_dir, 'stanford-parser/stanford-parser-3.5.1-models.jar')])
-    javac(os.path.join(lib_dir, 'DependencyParse.java'), cp=classpath)
-    javac(os.path.join(lib_dir, 'CollapseUnaryTransformer.java'), cp=classpath)
-    javac(os.path.join(lib_dir, 'ConstituencyParse.java'), cp=classpath)
+    classpath = os.path.join(lib_dir, 'stanford-parser/stanford-parser.jar')
 
     # split into separate files
     split(os.path.join(sick_dir, 'SICK_train.txt'), train_dir)

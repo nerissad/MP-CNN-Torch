@@ -59,26 +59,13 @@ def unzip(filepath):
         zf.extractall(dirpath)
     os.remove(filepath)
 
-def download_tagger(dirpath):
-    tagger_dir = 'stanford-tagger'
-    if os.path.exists(os.path.join(dirpath, tagger_dir)):
-        print('Found Stanford POS Tagger - skip')
-        return
-    url = 'http://nlp.stanford.edu/software/stanford-postagger-2015-01-29.zip'
-    filepath = download(url, dirpath)
-    zip_dir = ''
-    with zipfile.ZipFile(filepath) as zf:
-        zip_dir = zf.namelist()[0]
-        zf.extractall(dirpath)
-    os.remove(filepath)
-    os.rename(os.path.join(dirpath, zip_dir), os.path.join(dirpath, tagger_dir))
 
 def download_parser(dirpath):
     parser_dir = 'stanford-parser'
     if os.path.exists(os.path.join(dirpath, parser_dir)):
         print('Found Stanford Parser - skip')
         return
-    url = 'http://nlp.stanford.edu/software/stanford-parser-full-2015-01-29.zip'
+    url = 'http://nlp.stanford.edu/software/stanford-parser-full-2016-10-31.zip'
     filepath = download(url, dirpath)
     zip_dir = ''
     with zipfile.ZipFile(filepath) as zf:
@@ -109,17 +96,6 @@ def download_sick(dirpath):
     unzip(download(trial_url, dirpath))
     unzip(download(test_url, dirpath))
 
-def download_sst(dirpath):
-    if os.path.exists(dirpath):
-        print('Found SST dataset - skip')
-        return
-    url = 'http://nlp.stanford.edu/~socherr/stanfordSentimentTreebank.zip'
-    parent_dir = os.path.dirname(dirpath)
-    unzip(download(url, parent_dir))
-    os.rename(
-        os.path.join(parent_dir, 'stanfordSentimentTreebank'),
-        os.path.join(parent_dir, 'sst'))
-    shutil.rmtree(os.path.join(parent_dir, '__MACOSX')) # remove extraneous dir
 
 if __name__ == '__main__':
     base_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -128,14 +104,12 @@ if __name__ == '__main__':
     data_dir = os.path.join(base_dir, 'data')
     wordvec_dir = os.path.join(data_dir, 'glove')
     sick_dir = os.path.join(data_dir, 'sick')
-    sst_dir = os.path.join(data_dir, 'sst')
 
     # libraries
     lib_dir = os.path.join(base_dir, 'lib')
 
     # download dependencies
-    #download_tagger(lib_dir)
-    #download_parser(lib_dir)
+    download_parser(lib_dir)
     download_wordvecs(wordvec_dir)
-    #download_sick(sick_dir)
-    #download_sst(sst_dir)
+    download_sick(sick_dir)
+
