@@ -31,8 +31,9 @@ function similarityMeasure.read_sentences(path, vocab)
       sent[i] = vocab:index(token)
     end
     if fixed and len < 3 then
-      for i = len+1, padLen do
-        sent[i] = vocab:index("unk") -- sent[len]
+    --vocab:add_unk_token()
+      for i = len+1, padLen do            
+        sent[i] = vocab:index("unk") 
       end
     end
     sentences[#sentences + 1] = sent
@@ -54,13 +55,7 @@ function similarityMeasure.read_relatedness_dataset(dir, vocab, task)
   dataset.labels = torch.Tensor(dataset.size)
   for i = 1, dataset.size do
     dataset.ids[i] = id_file:readInt()
-    if task == 'sic' then
-    	dataset.labels[i] = 0.25 * (sim_file:readDouble() - 1) -- sic data
-    elseif task == 'vid' then
-	dataset.labels[i] = 0.2 * (sim_file:readDouble()) -- vid data
-    else
-    	dataset.labels[i] = (sim_file:readDouble()) -- twi and msp
-    end
+    dataset.labels[i] = sim_file:readDouble()
   end
   id_file:close()
   sim_file:close()
